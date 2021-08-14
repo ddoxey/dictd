@@ -29,6 +29,20 @@ The definitions dict looks like:
             ...
 ```
 
+If you only care about the part of speech:
+
+```
+    Dictd.parts_of_speech("shovel")
+```
+
+Which returns a dict of each POS with the number of times it appears in the
+definitions.
+
+```
+    {'n': 5, 'v': 3}
+```
+
+
 A given source may appear multiple times, and each source entry may have multiple
 definitions, or a list of synonyms.
 

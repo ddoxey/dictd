@@ -290,21 +290,22 @@ class Dictd:
 
 
     @classmethod
-    def guess_pos(cls, word):
+    def parts_of_speech(cls, word):
 
         definition_for = cls.lookup(word)
 
         if definition_for is None:
             return None
 
-        parts_of_speech = {}
+        parts_of_speech = defaultdict(int)
 
         for source in definition_for:
-            for pos in definition_for[source]['pos']:
-                parts_of_speech[pos] = definition_for[source]['pos'][pos]
+            for entry in definition_for[source]['entries']:
+                if 'pos' in entry:
+                    for pos in entry['pos']:
+                        parts_of_speech[pos] += 1
 
         if len(parts_of_speech) == 0:
-            raise Exception(f'No parts of speech found for: "{word}"')
+            return None
 
-        return sorted(list(parts_of_speech.keys()), key = lambda p: parts_of_speech[p])
-
+        return dict(parts_of_speech)
