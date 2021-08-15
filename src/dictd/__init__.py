@@ -55,6 +55,7 @@ class Dictd:
 
     KnownPOS = {
         'n': 'n',
+        'a': 'adj',
         'adj': 'adj',
         'v': 'v',
         'pro': 'pro',
@@ -108,10 +109,14 @@ class Dictd:
         entry = Dictd.Entry()
         bracket_depth = 0
         last_pos = None
+        line_n = 0
 
         while entry.pos() == 0 or bracket_depth > 0:
 
             tokens = Dictd._tokenize(lines.pop(0))
+
+            if line_n == 0 and tokens[0] != word:
+                return None
 
             for token in [t for t in tokens if len(t) > 0]:
                 pos = None
@@ -124,15 +129,18 @@ class Dictd:
                     bracket_depth += token.count('[')
                     bracket_depth -= token.count(']')
 
+            line_n += 1
+
         for line in [l.strip() for l in lines]:
 
             if len(line) == 0:
                 continue
 
             if re.search(r'^\s*[[][0-9]+[ ]Webster[]]$', line):
-                entry.add(line)
-                entries.append(entry.flush())
-                entry.pos(last_pos)
+                if entry.size() > 0:
+                    entry.add(line)
+                    entries.append(entry.flush())
+                    entry.pos(last_pos)
                 continue
 
             tokens = [t for t in Dictd._tokenize(line) if len(t) > 0]
@@ -140,6 +148,9 @@ class Dictd:
             if tokens[0].startswith('{') and tokens[0].endswith('}'):
                 entry.flush()
                 break
+
+            if entry.size() == 0 and not re.search(r'^[0-9]+[:.]$', tokens[0]):
+                continue
 
             for n, token in enumerate(tokens):
                 if n == 0 and re.search(r'^[0-9]+[:.]$', token):
@@ -225,7 +236,10 @@ class Dictd:
         cmd = [cls.DICT, '-f', word]
         app = subprocess.Popen(cmd, stdout = subprocess.PIPE)
         for bline in app.stdout:
-            yield bline.decode('utf8')
+            try:
+                yield bline.decode('utf8')
+            except Exception:
+                pass
 
 
     @classmethod
