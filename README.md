@@ -5,7 +5,10 @@ This is wrapper for the dict Linux command line program, which distributes as th
 
 The objective of this module is to bring all of data in the Dict.org database to
 life in Python with a consistent data structure. This is somewhat of a challenge,
-given the considerable variation in the Dict.org free form human readable text.
+given that depends on parsing the free form human readable text from Dict.org.
+
+Currently this is known to do a good job of parsing 'wn', 'gcide', and the
+'moby-thesaurus' definitions.
 
 
 # Usage
