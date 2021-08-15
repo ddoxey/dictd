@@ -1,7 +1,8 @@
-import subprocess
-from pprint import pprint, pformat
-from collections import defaultdict
+import os
 import re
+import pickle
+import subprocess
+from collections import defaultdict
 
 
 class Dictd:
@@ -285,20 +286,53 @@ class Dictd:
 
 
     @classmethod
+    def _cache_filename_(cls, word):
+        if 'HOME' not in os.environ:
+            return None
+        cache_dir = os.path.join(os.environ['HOME'], '.dictd')
+        if not os.path.isdir(cache_dir):
+            os.mkdir(cache_dir)
+        word = re.sub(r'[^a-z0-0]+', "-", word.lower())
+        return os.path.join(cache_dir, f'{word}.pkl')
+
+
+    @classmethod
+    def _cache_get_(cls, word):
+        filename = cls._cache_filename_(word)
+        if os.path.exists(filename):
+            with open(filename, 'rb') as pkl_fh:
+                return pickle.load(pkl_fh)
+        return None
+
+
+    @classmethod
+    def _cache_store_(cls, word, definition_for):
+        filename = cls._cache_filename_(word)
+        with open(filename, 'wb') as pkl_fh:
+            pickle.dump(definition_for, pkl_fh)
+
+
+    @classmethod
     def lookup(cls, word):
 
-        raw_text_lines = cls._fetch_dictd_result_(word)
+        definition_for = cls._cache_get_(word)
 
-        definition_for = cls._parse_(word, raw_text_lines)
+        if definition_for is None:
 
-        if len(definition_for) == 0:
-            return None
+            raw_text_lines = cls._fetch_dictd_result_(word)
 
-        sources = list(definition_for.keys())
+            definition_for = cls._parse_(word, raw_text_lines)
 
-        for source in sources:
-            if len(definition_for[source]['entries']) == 0:
-                del definition_for[source]
+            if len(definition_for) == 0:
+                return None
+
+            sources = list(definition_for.keys())
+
+            for source in sources:
+                if len(definition_for[source]['entries']) == 0:
+                    del definition_for[source]
+
+            cls._cache_store_(word, definition_for)
 
         return definition_for
 
