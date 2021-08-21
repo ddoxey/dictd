@@ -1,12 +1,91 @@
 import unittest
-import os
-import re
-from pprint import pprint
-import sys
 from dictd import Dictd
 
 
 class TestDictionaryParsers(unittest.TestCase):
+
+    def test_foldoc_ca_n(self):
+        word = 'ca'
+        foldoc = '''
+  CA
+
+     1. <theory, architecture> {cellular automaton}.
+
+     2. <company> {Computer Associates}.
+
+     3. <cryptography> {Certificate Authority}.
+'''
+        result = Dictd._split_foldoc_entries_(word, foldoc.split('\n'))
+
+        expect = [
+            {'definition': 'Cellular Automaton (Theory, Architecture)'},
+            {'definition': 'Computer Associates (Company)'},
+            {'definition': 'Certificate Authority (Cryptography)'},
+        ]
+
+        self.assertEqual(result, expect, f'Correct parse of FOLDOC "{word}"')
+
+
+    def test_vera_ca_n(self):
+        word = 'ca'
+        vera = '''
+  CA
+           Certification Authority (cryptography, PKI)
+
+'''
+        result = Dictd._split_vera_entries_(word, vera.split('\n'))
+
+        expect = [
+            {'definition': 'Certification Authority (cryptography, PKI)'}
+        ]
+
+        self.assertEqual(result, expect, f'Correct parse of VERA "{word}"')
+
+
+    def test_gcide_ca_n(self):
+        word = 'ca'
+        gcide = '''
+  Ca \Ca\ n.
+     the chemical symbol for calcium, the fifth most abundant
+     element in the earth's crust, having an atomic number of 20.
+
+     Syn: calcium.
+          [WordNet 1.5]
+'''
+        result = Dictd._split_gcide_entries_(word, gcide.split('\n'))
+
+        expect = [
+            {'definition': 'The chemical symbol for calcium, the fifth most abundant '
+                           'element in the earth\'s crust, having an atomic number of 20. '
+                           'Syn: calcium. [WordNet 1.5]',
+             'pos': ['n']}
+        ]
+
+        self.assertEqual(result, expect, f'Correct parse of GCIDE "{word}"')
+
+
+    def test_gcide_ca_adv_prep(self):
+        word = 'ca'
+        gcide = '''
+  circa \cir"ca\ (s[~e]r"k[.a]), adv., prep. [L.]
+     Approximately; about; commonly abbreviated {ca.}; -- used
+     especially before dates and numerical measures; as, he was
+     born circa 1650; ca. 50 feet high.
+
+     Syn: ca.
+          [PJC]
+'''
+        result = Dictd._split_gcide_entries_(word, gcide.split('\n'))
+
+        expect = [
+            {'definition': 'Approximately; about; commonly abbreviated {ca.}; -- used '
+                           'especially before dates and numerical measures; as, he was '
+                           'born circa 1650; ca. 50 feet high. Syn: ca. [PJC]',
+             'pos': ['adv', 'prep']}
+        ]
+
+        self.assertEqual(result, expect, f'Correct parse of GCIDE "{word}"')
+
 
     def test_gcide_shovel_v(self):
         word = 'shovel'
@@ -88,19 +167,19 @@ class TestDictionaryParsers(unittest.TestCase):
         result = Dictd._split_wn_entries_(word, word_net.split('\n'))
 
         expect = [
-            {'definition': 'a hand tool for lifting loose material; consists of a '
+            {'definition': 'A hand tool for lifting loose material; consists of a '
                            'curved container or scoop and a handle',
              'pos': ['n']},
-            {'definition': 'the quantity a shovel can hold [syn: {shovel}, '
+            {'definition': 'The quantity a shovel can hold [syn: {shovel}, '
                            '{shovelful}, {spadeful}]',
              'pos': ['n']},
-            {'definition': 'a fire iron consisting of a small shovel used to scoop '
+            {'definition': 'A fire iron consisting of a small shovel used to scoop '
                            'coals or ashes in a fireplace',
              'pos': ['n']},
-            {'definition': 'a machine for excavating [syn: {power shovel}, '
+            {'definition': 'A machine for excavating [syn: {power shovel}, '
                            '{excavator}, {digger}, {shovel}]',
              'pos': ['n']},
-            {'definition': 'dig with or as if with a shovel; "shovel sand"; "he '
+            {'definition': 'Dig with or as if with a shovel; "shovel sand"; "he '
                            'shovelled in the backyard all afternoon long"',
              'pos': ['v']}]
 

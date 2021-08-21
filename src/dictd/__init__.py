@@ -17,6 +17,8 @@ class Dictd:
             return
 
         def add(self, token):
+            if len(self.tokens) == 0:
+                token = token.title()
             self.tokens.append(token)
 
         def last(self):
@@ -38,6 +40,12 @@ class Dictd:
             return len(self.tokens)
 
         def definition(self):
+            if len(self.p_of_s) == 0:
+                if len(self.tokens) == 0:
+                    return None
+                else:
+                    return {
+                        'definition': ' '.join(self.tokens)}
             return {
                 'pos': self.p_of_s,
                 'definition': ' '.join(self.tokens)}
@@ -70,7 +78,7 @@ class Dictd:
 
     @classmethod
     def _get_pos_(cls, candidate):
-        candidate = candidate.lower().strip().strip('.')
+        candidate = re.sub(r'\W+', "", candidate.lower().strip())
         if candidate in cls.KnownPOS:
             return cls.KnownPOS[candidate]
         return None
@@ -112,11 +120,27 @@ class Dictd:
         last_pos = None
         line_n = 0
 
+        def _validate_(word, tokens):
+            if tokens[0].lower() == word:
+                return True
+            if len(tokens) > 1:
+                # i.e.  ca => circa \cir"ca\
+                for token in re.split(r'\W+', tokens[1].strip('\\').lower()):
+                    if token == word:
+                        return True
+            return False
+
         while entry.pos() == 0 or bracket_depth > 0:
 
-            tokens = Dictd._tokenize(lines.pop(0))
+            if len(lines) == 0:
+                return None
 
-            if line_n == 0 and tokens[0] != word:
+            tokens = [t for t in Dictd._tokenize(lines.pop(0)) if len(t) > 0]
+
+            if len(tokens) == 0:
+                continue
+
+            if line_n == 0 and not _validate_(word.lower(), tokens):
                 return None
 
             for token in [t for t in tokens if len(t) > 0]:
@@ -137,7 +161,7 @@ class Dictd:
             if len(line) == 0:
                 continue
 
-            if re.search(r'^\s*[[][0-9]+[ ]Webster[]]$', line):
+            if line.startswith('[') and line.endswith(']'):
                 if entry.size() > 0:
                     entry.add(line)
                     entries.append(entry.flush())
@@ -150,9 +174,6 @@ class Dictd:
                 entry.flush()
                 break
 
-            if entry.size() == 0 and not re.search(r'^[0-9]+[:.]$', tokens[0]):
-                continue
-
             for n, token in enumerate(tokens):
                 if n == 0 and re.search(r'^[0-9]+[:.]$', token):
                     if entry.size() > 0:
@@ -160,6 +181,62 @@ class Dictd:
                         entry.pos(last_pos)
                 else:
                     entry.add(token)
+
+        if entry.size() > 0:
+            entries.append(entry.flush())
+
+        return entries
+
+
+    @classmethod
+    def _split_vera_entries_(cls, word, lines):
+        entries = []
+        entry = Dictd.Entry()
+
+        for line in [l.strip().strip('.') for l in lines]:
+
+            if len(line) == 0:
+                continue
+
+            if line.lower() == word.lower():
+                if entry.size() > 0:
+                    entries.append(entry.flush())
+                continue
+
+            for token in Dictd._tokenize(line):
+                if len(token) > 0:
+                    entry.add(token)
+
+        if entry.size() > 0:
+            entries.append(entry.flush())
+
+        return entries
+
+
+    @classmethod
+    def _split_foldoc_entries_(cls, word, lines):
+        entries = []
+        entry = Dictd.Entry()
+
+        for line in [l.strip().strip('.') for l in lines]:
+
+            if len(line) == 0:
+                continue
+
+            if line.lower() == word.lower():
+                if entry.size() > 0:
+                    entries.append(entry.flush())
+                continue
+
+            if re.search(r'^[0-9]+[:.][ ]', line):
+                if entry.size() > 0:
+                    entries.append(entry.flush())
+                line = re.sub(r'^[0-9]+[:.][ ]+', "", line)
+
+            line = re.sub(r'<([^>]+)>[ ]+(.+)', r'\2 (\1)', line.title())
+            line = re.sub(r'[{]([^>]+)[}][ ]+(.+)', r'\1 \2', line)
+
+            entry.add(line)
 
         if entry.size() > 0:
             entries.append(entry.flush())
@@ -219,9 +296,11 @@ class Dictd:
     def _split_definition_entries_(cls, word, source, lines):
 
         parse_for = {
-            'wn': cls._split_wn_entries_,
-            'gcide': cls._split_gcide_entries_,
             'moby-thesaurus': cls._split_mobythesaurus_entries_,
+            'gcide': cls._split_gcide_entries_,
+            'vera': cls._split_vera_entries_,
+            'foldoc': cls._split_foldoc_entries_,
+            'wn': cls._split_wn_entries_,
         }
 
         source_abbr = source.split('\t')
@@ -229,18 +308,12 @@ class Dictd:
         if len(source_abbr) < 3 or source_abbr[2] not in parse_for:
             return None
 
-        return parse_for[source_abbr[2]](word, lines)
+        results = parse_for[source_abbr[2]](word, lines)
 
+        if results is not None:
+            return [result for result in results if result is not None]
 
-    @classmethod
-    def _fetch_dictd_result_(cls, word):
-        cmd = [cls.DICT, '-f', word]
-        app = subprocess.Popen(cmd, stdout = subprocess.PIPE)
-        for bline in app.stdout:
-            try:
-                yield bline.decode('utf8')
-            except Exception:
-                pass
+        return None
 
 
     @classmethod
@@ -257,13 +330,13 @@ class Dictd:
                 definition['source'],
                 definition['lines'])
             if definition['entries'] is not None:
-                source = '0.{}'.format(definition['source'].replace('\t', " "))
-                while source in definition_for:
-                    n, src = source.split('.', 1)
-                    source = '{}.{}'.format(int(n) + 1, src)
+                source = definition['source'].replace('\t', " ")
                 del definition['lines']
-                definition['source'] = definition['source'].split('\t')
-                definition_for[source] = definition
+                del definition['source']
+                if source in definition_for:
+                    definition_for[source]['entries'].extend(definition['entries'])
+                else:
+                    definition_for[source] = definition
 
         for line in lines:
 
@@ -283,6 +356,17 @@ class Dictd:
         _ingest(definition)
 
         return definition_for
+
+
+    @classmethod
+    def _fetch_dictd_result_(cls, word):
+        cmd = [cls.DICT, '-f', word]
+        app = subprocess.Popen(cmd, stdout = subprocess.PIPE)
+        for bline in app.stdout:
+            try:
+                yield bline.decode('utf8')
+            except Exception:
+                pass
 
 
     @classmethod
