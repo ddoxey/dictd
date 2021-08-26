@@ -361,12 +361,13 @@ class Dictd:
     @classmethod
     def _fetch_dictd_result_(cls, word):
         cmd = [cls.DICT, '-f', word]
-        app = subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        for bline in app.stdout:
-            try:
-                yield bline.decode('utf8')
-            except Exception:
-                pass
+        with subprocess.Popen(cmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE) as app:
+            for bline in app.stdout:
+                try:
+                    yield bline.decode('utf8')
+                except Exception:
+                    pass
+            app.kill()
 
 
     @classmethod
