@@ -22,8 +22,8 @@ Currently this is known to do a good job of parsing 'wn', 'gcide', and the
 The definitions dict looks like:
 
 ```
-    { [source name]: [
-        { 'source': [source name tokens],
+    { [source-keyword]: [
+        { 'source': [source name],
           'entries': [
             { 'pos': [parts of speech],
               'definition': [text of definition]},

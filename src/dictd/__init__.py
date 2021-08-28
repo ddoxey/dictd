@@ -293,7 +293,7 @@ class Dictd:
 
 
     @classmethod
-    def _split_definition_entries_(cls, word, source, lines):
+    def _split_definition_entries_(cls, word, key, lines):
 
         parse_for = {
             'moby-thesaurus': cls._split_mobythesaurus_entries_,
@@ -303,12 +303,10 @@ class Dictd:
             'wn': cls._split_wn_entries_,
         }
 
-        source_abbr = source.split('\t')
-
-        if len(source_abbr) < 3 or source_abbr[2] not in parse_for:
+        if len(key) < 3 or key not in parse_for:
             return None
 
-        results = parse_for[source_abbr[2]](word, lines)
+        results = parse_for[key](word, lines)
 
         if results is not None:
             return [result for result in results if result is not None]
@@ -327,29 +325,39 @@ class Dictd:
                 return
             definition['entries'] = cls._split_definition_entries_(
                 word.title(),
-                definition['source'],
+                definition['key'],
                 definition['lines'])
             if definition['entries'] is not None:
-                source = definition['source'].replace('\t', " ")
+                key = definition['key']
                 del definition['lines']
-                del definition['source']
-                if source in definition_for:
-                    definition_for[source]['entries'].extend(definition['entries'])
+                del definition['key']
+                if key in definition_for:
+                    definition_for[key]['entries'].extend(definition['entries'])
                 else:
-                    definition_for[source] = definition
+                    definition_for[key] = definition
 
         for line in lines:
 
             if line[0] != ' ':
 
+                if 'definitions found' in line:
+                    continue
+
                 _ingest(definition)
 
-                definition = {
-                    'source': line.strip(),
-                    'lines': [],
-                }
+                definition = { 'lines': [] }
 
-            elif 'source' in definition:
+                source = line.strip().split('\t')
+
+                if len(source) > 2:
+
+                    definition = {
+                        'source': ' '.join(source),
+                        'key': source[2],
+                        'lines': [],
+                    }
+
+            elif 'key' in definition:
 
                 definition['lines'].append(line)
 
@@ -411,11 +419,11 @@ class Dictd:
             if len(definition_for) == 0:
                 return None
 
-            sources = list(definition_for.keys())
+            keys = list(definition_for.keys())
 
-            for source in sources:
-                if len(definition_for[source]['entries']) == 0:
-                    del definition_for[source]
+            for key in keys:
+                if len(definition_for[key]['entries']) == 0:
+                    del definition_for[key]
 
             cls._cache_store_(word, definition_for)
 
@@ -432,8 +440,8 @@ class Dictd:
 
         parts_of_speech = defaultdict(int)
 
-        for source in definition_for:
-            for entry in definition_for[source]['entries']:
+        for key in definition_for:
+            for entry in definition_for[key]['entries']:
                 if 'pos' in entry:
                     for pos in entry['pos']:
                         parts_of_speech[pos] += 1

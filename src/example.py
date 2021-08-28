@@ -7,9 +7,13 @@ from dictd import Dictd
 
 def run(word):
 
+    print('Definitions:')
     x = Dictd.lookup(word)
     pprint(x)
 
+    print("")
+
+    print('Parts of Speech:', end=" ")
     x = Dictd.parts_of_speech(word)
     pprint(x)
 
